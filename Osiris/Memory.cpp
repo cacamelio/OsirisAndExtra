@@ -80,8 +80,10 @@ static std::uintptr_t findPattern(const char* moduleName, std::string_view patte
 
 Memory::Memory() noexcept
 {
-    present = findPattern("gameoverlayrenderer", "\xFF\x15????\x8B\xF0\x85\xFF") + 2;
-    reset = findPattern("gameoverlayrenderer", "\xC7\x45?????\xFF\x15????\x8B\xD8") + 9;
+   /* present = findPattern("gameoverlayrenderer", "\xFF\x15????\x8B\xF0\x85\xFF") + 2;
+    reset = findPattern("gameoverlayrenderer", "\xC7\x45?????\xFF\x15????\x8B\xD8") + 9;*/
+
+    device = **reinterpret_cast<void****>(findPattern("shaderapidx9", "\xA1????\x50\x8B\x08\xFF\x51\x0C") + 1);
 
     clientMode = **reinterpret_cast<ClientMode***>((*reinterpret_cast<uintptr_t**>(interfaces->client))[10] + 5);
     input = *reinterpret_cast<Input**>((*reinterpret_cast<uintptr_t**>(interfaces->client))[16] + 1);
