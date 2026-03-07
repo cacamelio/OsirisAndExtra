@@ -83,8 +83,23 @@ void Tickbase::end(UserCmd* cmd) noexcept
         return;
     }
 
+    //maybe fix hideshots ?
+    if (config->tickbase.hideshots.isActive() && !config->tickbase.doubletap.isActive())
+    {
+        const auto activeWeapon = localPlayer->getActiveWeapon();
+
+        if (activeWeapon && !activeWeapon->isKnife() && !activeWeapon->isGrenade() &&
+            !activeWeapon->isBomb() && activeWeapon->itemDefinitionIndex2() != WeaponId::Revolver &&
+            activeWeapon->itemDefinitionIndex2() != WeaponId::Taser &&
+            activeWeapon->itemDefinitionIndex2() != WeaponId::Healthshot)
+        {
+            if ((cmd->buttons & UserCmd::IN_ATTACK) && !canShift(targetTickShift, false))
+                cmd->buttons &= ~UserCmd::IN_ATTACK;
+        }
+    }
+
     if (cmd->buttons & UserCmd::IN_ATTACK)
-       shift(cmd, targetTickShift);
+        shift(cmd, targetTickShift);
 }
 
 bool Tickbase::shift(UserCmd* cmd, int shiftAmount, bool forceShift) noexcept
