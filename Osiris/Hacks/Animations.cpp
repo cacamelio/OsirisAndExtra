@@ -33,12 +33,14 @@ static Vector correctAngle{};
 static int buildTransformsIndex = -1;
 static std::array<AnimationLayer, 13> staticLayers{};
 static std::array<AnimationLayer, 13> layers{};
+static std::array<AnimationLayer, 13> layers_p{};
+static std::array<AnimationLayer, 13> layers_n{};
 static float primaryCycle{ 0.0f };
 static float moveWeight{ 0.0f };
 static float footYaw{};
 static std::array<float, 24> poseParameters{};
 static std::array<AnimationLayer, 13> sendPacketLayers{};
-
+static Vector sentViewangles{};
 void Animations::init() noexcept
 {
     static auto threadedBoneSetup = interfaces->cvar->findVar("cl_threaded_bone_setup");
@@ -126,7 +128,8 @@ void Animations::update(UserCmd* cmd, bool& _sendPacket) noexcept
     localPlayer->updateClientSideAnimation();
 
     std::memcpy(&layers, localPlayer->animOverlays(), sizeof(AnimationLayer) * localPlayer->getAnimationLayersCount());
-
+    if (sendPacket)
+        sentViewangles = cmd->viewangles;
     if (sendPacket)
     {
         std::memcpy(&sendPacketLayers, localPlayer->animOverlays(), sizeof(AnimationLayer) * localPlayer->getAnimationLayersCount());
@@ -211,7 +214,7 @@ void Animations::fake() noexcept
         memory->setAbsAngle(localPlayer.get(), Vector{ 0, fakeAnimState->footYaw, 0 });
         std::memcpy(localPlayer->animOverlays(), &layers, sizeof(AnimationLayer) * localPlayer->getAnimationLayersCount());
         localPlayer->getAnimationLayer(ANIMATION_LAYER_LEAN)->weight = std::numeric_limits<float>::epsilon();
-        
+
         gotMatrix = localPlayer->setupBones(fakematrix.data(), localPlayer->getBoneCache().size, 0x7FF00, memory->globalVars->currenttime);
         gotMatrixFakelag = gotMatrix;
         if (gotMatrix)
@@ -311,9 +314,13 @@ void Animations::handlePlayers(FrameStage stage) noexcept
 
         const uintptr_t backupEffects = entity->getEffects();
 
+
+
         entity->getEffects() |= 8;
 
         bool runPostUpdate = false;
+
+        auto& prev_records = players.at(i);
 
         if (player.simulationTime != entity->simulationTime() && player.simulationTime < entity->simulationTime())
         {
@@ -343,6 +350,10 @@ void Animations::handlePlayers(FrameStage stage) noexcept
             //Misc variables
             player.moveWeight = entity->getAnimstate()->moveWeight;
             player.flags = entity->flags();
+
+            player.m_flLowerBodyYawTarget = entity->getAnimstate()->footYaw;
+            player.eye_yaw = entity->getAnimstate()->eyeYaw;
+
 
             if (player.simulationTime == entity->simulationTime())
             {
@@ -422,7 +433,6 @@ void Animations::handlePlayers(FrameStage stage) noexcept
                 player.velocity.x = 0.f;
                 player.velocity.y = 0.f;
             }
-
             Resolver::runPreUpdate(player, entity);
 
             //Run animations
@@ -472,7 +482,7 @@ void Animations::handlePlayers(FrameStage stage) noexcept
             }
             updatingEntity = false;
 
-            Resolver::runPostUpdate(player, entity);
+
 
             //Fix jump pose
             if (!(entity->flags() & 1) && !player.oldlayers.empty())// && entity->moveType() != MoveType::NOCLIP)
@@ -520,7 +530,7 @@ void Animations::handlePlayers(FrameStage stage) noexcept
             }
         }
 
-        std::memcpy(entity->animOverlays(), &layers, sizeof(AnimationLayer)* entity->getAnimationLayersCount());
+        std::memcpy(entity->animOverlays(), &layers, sizeof(AnimationLayer) * entity->getAnimationLayersCount());
 
         //Setupbones
         if (runPostUpdate)
@@ -536,6 +546,8 @@ void Animations::handlePlayers(FrameStage stage) noexcept
 
         entity->getEffects() = backupEffects;
 
+        Resolver::runPostUpdate(player, entity);
+
         //Backtrack records
 
         if (!config->backtrack.enabled || !entity->isOtherEnemy(localPlayer.get()))
@@ -546,7 +558,10 @@ void Animations::handlePlayers(FrameStage stage) noexcept
 
         if (runPostUpdate)
         {
-            if (!player.backtrackRecords.empty() && (player.backtrackRecords.front().simulationTime == entity->simulationTime()))
+            if (!player.backtrackRecords.empty() && (player.backtrackRecords.front().simulationTime == entity->simulationTime()) && (entity->getAnimstate()->vecVelocity.length2D() > CSGO_ANIM_MAX_VEL_LIMIT))
+                continue;
+
+            if (!Backtrack::valid(player.simulationTime))
                 continue;
 
             Players::Record record{ };
@@ -555,13 +570,17 @@ void Animations::handlePlayers(FrameStage stage) noexcept
             record.simulationTime = player.simulationTime;
             record.mins = player.mins;
             record.maxs = player.maxs;
+            record.velocity = player.velocity;
             std::copy(player.matrix.begin(), player.matrix.end(), record.matrix);
-            record.positions.push_back(record.matrix[8].origin());
-
+            for (auto bone : { 8, 4, 3, 7, 6, 5 }) {
+                record.positions.push_back(record.matrix[bone].origin());
+            }
             player.backtrackRecords.push_front(record);
 
             while (player.backtrackRecords.size() > 3 && player.backtrackRecords.size() > static_cast<size_t>(timeToTicks(timeLimit)))
                 player.backtrackRecords.pop_back();
+            if (auto invalid = std::find_if(std::cbegin(player.backtrackRecords), std::cend(player.backtrackRecords), [](const Players::Record& rec) { return !Backtrack::valid(rec.simulationTime); }); invalid != std::cend(player.backtrackRecords))
+                player.backtrackRecords.erase(invalid, std::cend(player.backtrackRecords));
         }
     }
 }
@@ -669,7 +688,7 @@ int& Animations::buildTransformationsIndex() noexcept
 
 Vector* Animations::getCorrectAngle() noexcept
 {
-    return &correctAngle;
+    return &sentViewangles;
 }
 
 Vector* Animations::getViewAngles() noexcept

@@ -8,7 +8,7 @@
 
 std::deque<Resolver::SnapShot> snapshots;
 
-bool resolver = false;
+bool resolver = true;
 
 void Resolver::reset() noexcept
 {
@@ -181,6 +181,15 @@ void Resolver::processMissedShots() noexcept
 		Logger::addLog("Missed due to spread");
 }
 
+void resolve_yaw(Animations::Players player, Entity* entity)
+{
+
+	//to do : make a resolver that actually works and not just set foot yaw to eye yaw
+
+	entity->getAnimstate()->footYaw = Helpers::normalizeYaw(entity->getAnimstate()->eyeYaw);
+
+}
+
 void Resolver::runPreUpdate(Animations::Players player, Entity* entity) noexcept
 {
 	if (!resolver)
@@ -190,8 +199,10 @@ void Resolver::runPreUpdate(Animations::Players player, Entity* entity) noexcept
 	if (!entity || !entity->isAlive())
 		return;
 
-	if (player.chokedPackets <= 0)
+	if (player.chokedPackets < 2)
 		return;
+
+	resolve_yaw(player, entity);
 }
 
 void Resolver::runPostUpdate(Animations::Players player, Entity* entity) noexcept
@@ -203,8 +214,11 @@ void Resolver::runPostUpdate(Animations::Players player, Entity* entity) noexcep
 	if (!entity || !entity->isAlive())
 		return;
 
-	if (player.chokedPackets <= 0)
+	if (player.chokedPackets < 2)
 		return;
+
+	resolve_yaw(player, entity);
+
 }
 
 void Resolver::updateEventListeners(bool forceRemove) noexcept

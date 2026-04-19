@@ -2,6 +2,7 @@
 #include "../Memory.h"
 
 #include "EnginePrediction.h"
+#include "Tickbase.h"
 
 #include "../SDK/ClientState.h"
 #include "../SDK/Engine.h"
@@ -44,7 +45,7 @@ void EnginePrediction::run(UserCmd* cmd) noexcept
         return;
 
     inPrediction = true;
-    
+
     localPlayerFlags = localPlayer->flags();
     localPlayerVelocity = localPlayer->velocity();
 

@@ -66,6 +66,7 @@ namespace Animations
 			Vector absAngle;
 			Vector mins;
 			Vector maxs;
+			Vector velocity;
 			float simulationTime;
 			matrix3x4 matrix[MAXSTUDIOBONES];
 		};
@@ -73,14 +74,18 @@ namespace Animations
 		std::deque<Record> backtrackRecords;
 
 		std::array<matrix3x4, MAXSTUDIOBONES> matrix;
-		std::array<AnimationLayer, 13> layers { };
-		std::array<AnimationLayer, 13> oldlayers { };
+		std::array<AnimationLayer, 13> layers{ };
+		std::array<AnimationLayer, 13> oldlayers{ };
 
 		Vector mins{}, maxs{};
 		Vector origin{}, oldOrigin{}, absAngle{};
 		Vector velocity{}, oldVelocity{};
 
 		float spawnTime{ 0.f };
+		float workingangle = 0.f;
+		bool extended{ false };
+		int side{ 0 };
+		bool shot{ false };
 
 		float simulationTime{ -1.0f };
 		int chokedPackets{ 0 };
@@ -91,6 +96,9 @@ namespace Animations
 
 		float duckAmount{ 0.0f };
 		float oldDuckAmount{ 0.0f };
+
+		float m_flLowerBodyYawTarget{ 0.0f };
+		float eye_yaw{ 0.0f };
 
 		int flags{ 0 };
 
@@ -112,6 +120,8 @@ namespace Animations
 			oldVelocity = Vector{};
 			mins = Vector{};
 			maxs = Vector{};
+			m_flLowerBodyYawTarget = { 0.0f };
+			eye_yaw = { 0.0f };
 
 			backtrackRecords.clear();
 		}

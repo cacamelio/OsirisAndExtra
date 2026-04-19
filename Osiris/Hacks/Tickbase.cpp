@@ -150,12 +150,23 @@ bool Tickbase::canRun() noexcept
         return true;
     }
 
-    if ((ticksAllowedForProcessing < targetTickShift || chokedPackets > maxUserCmdProcessTicks - targetTickShift) && memory->globalVars->realtime - realTime > 1.0f)
+    if (ticksAllowedForProcessing < targetTickShift || chokedPackets > maxUserCmdProcessTicks - targetTickShift)
     {
-        ticksAllowedForProcessing = min(ticksAllowedForProcessing + 1, maxUserCmdProcessTicks);
-        chokedPackets = max(chokedPackets - 1, 0);
-        pauseTicks++;
-        return false;
+        bool canRecharge = (memory->globalVars->realtime - realTime > 0.2f);
+
+        if (const auto activeWeapon = localPlayer->getActiveWeapon(); activeWeapon)
+        {
+            if (activeWeapon->nextPrimaryAttack() > memory->globalVars->serverTime() || activeWeapon->clip() == 0)
+                canRecharge = true;
+        }
+
+        if (canRecharge)
+        {
+            ticksAllowedForProcessing = min(ticksAllowedForProcessing + 1, maxUserCmdProcessTicks);
+            chokedPackets = max(chokedPackets - 1, 0);
+            pauseTicks++;
+            return false;
+        }
     }
     return true;
 }
@@ -165,7 +176,7 @@ bool Tickbase::canShift(int shiftAmount, bool forceShift) noexcept
     if (!localPlayer || !localPlayer->isAlive())
         return false;
 
-    if (!shiftAmount || shiftAmount > ticksAllowedForProcessing || memory->globalVars->realtime - realTime <= 0.5f)
+    if (!shiftAmount || shiftAmount > ticksAllowedForProcessing)
         return false;
 
     if (forceShift)
@@ -182,13 +193,14 @@ bool Tickbase::canShift(int shiftAmount, bool forceShift) noexcept
         return false;
 
     const float shiftTime = (localPlayer->tickBase() - shiftAmount) * memory->globalVars->intervalPerTick;
+
     if (localPlayer->nextAttack() > shiftTime)
         return false;
 
     if (localPlayer->shotsFired() > 0 && !activeWeapon->isFullAuto())
         return false;
 
-	return activeWeapon->nextPrimaryAttack() <= shiftTime;
+    return activeWeapon->nextPrimaryAttack() <= shiftTime;
 }
 
 int Tickbase::getCorrectTickbase(int commandNumber) noexcept
